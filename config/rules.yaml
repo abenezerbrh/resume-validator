@@ -1,0 +1,20 @@
+resume:
+  max_pages: 1
+  max_bullet_words: 28
+
+  required_sections:
+    - Profile
+    - Education
+    - Experience
+    - Projects
+    - Technical Skills
+
+  required_contact:
+    - email
+    - phone
+    - linkedin
+    - github
+
+  formatting:
+    min_font_size: 9
+    max_font_size: 11
