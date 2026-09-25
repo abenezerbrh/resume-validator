@@ -18,3 +18,63 @@ resume:
   formatting:
     min_font_size: 9
     max_font_size: 11
+
+job:
+  skills:
+    Python:
+      - Python
+
+    JavaScript:
+      - JavaScript
+      - JavaScript programming
+
+    TypeScript:
+      - TypeScript
+
+    React:
+      - React
+      - React.js
+      - ReactJS
+
+    Node.js:
+      - Node.js
+      - Node
+
+    FastAPI:
+      - FastAPI
+
+    Flask:
+      - Flask
+
+    Django:
+      - Django
+
+    SQL:
+      - SQL
+      - SQL databases
+
+    PostgreSQL:
+      - PostgreSQL
+      - Postgres
+
+    MySQL:
+      - MySQL
+
+    REST APIs:
+      - REST API
+      - REST APIs
+      - RESTful API
+      - RESTful APIs
+
+    Git:
+      - Git
+
+    GitHub:
+      - GitHub
+
+    Docker:
+      - Docker
+
+    AWS:
+      - AWS
+      - Amazon Web Services

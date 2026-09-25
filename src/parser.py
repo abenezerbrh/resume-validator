@@ -31,3 +31,7 @@ def get_resume_text(parsed_resume):
         paragraph["text"]
         for paragraph in parsed_resume["paragraphs"]
     )
+def load_job_posting(file_path):
+  with open(file_path, "r", encoding="utf-8") as file:
+    return file.read()
+  

@@ -1,0 +1,23 @@
+Software Developer Intern
+
+We are looking for a Software Developer Intern to join our team.
+
+Responsibilities:
+- Build and maintain web applications using React.
+- Develop backend services using Python and FastAPI.
+- Work with REST APIs and SQL databases.
+- Collaborate with developers using Git and GitHub.
+- Write clean and maintainable code.
+
+Required Skills:
+- JavaScript
+- React
+- Python
+- SQL
+- Git
+- REST APIs
+
+Preferred Skills:
+- Docker
+- AWS
+- PostgreSQL

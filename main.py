@@ -3,7 +3,11 @@ import yaml
 
 from src.parser import parse_resume
 from src.validator import validate_resume
-
+from src.parser import load_job_posting
+from src.job_analyzer import (
+    extract_job_skills,
+    compare_resume_to_job
+)
 
 def load_rules():
     with open("config/rules.yaml", "r", encoding="utf-8") as file:
@@ -47,19 +51,70 @@ def print_report(results, file_path):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python main.py <resume.docx>")
+    if len(sys.argv) != 3:
+        print("Usage: python main.py <resume.docx> <job.txt>")
         return
 
-    file_path = sys.argv[1]
+    resume_path = sys.argv[1]
+    job_path = sys.argv[2]
 
     rules = load_rules()
-    resume = parse_resume(file_path)
 
-    results = validate_resume(resume, rules)
+    resume = parse_resume(resume_path)
 
-    print_report(results, file_path)
+    resume_results = validate_resume(
+        resume,
+        rules
+    )
 
+    job_text = load_job_posting(job_path)
+
+    job_skills = extract_job_skills(
+        job_text,
+        rules["job"]["skills"]
+    )
+
+    resume_text = "\n".join(
+        paragraph["text"]
+        for paragraph in resume["paragraphs"]
+    )
+
+    comparison = compare_resume_to_job(
+        resume_text,
+        job_skills
+    )
+
+    print_report(
+        resume_results,
+        resume_path
+    )
+
+    print("\n" + "=" * 50)
+    print("             JOB ANALYSIS")
+    print("=" * 50)
+
+    print("\nSKILLS FOUND IN JOB")
+    print("-------------------")
+
+    for skill in job_skills:
+        print(f"• {skill}")
+
+    print("\nMATCHED BY RESUME")
+    print("-----------------")
+
+    for match in comparison["matched_skills"]:
+        print(
+            f"✓ {match['skill']} "
+            f"(found: {match['evidence']})"
+        )
+
+    print("\nMISSING FROM RESUME")
+    print("-------------------")
+
+    for skill in comparison["missing_skills"]:
+        print(f"✗ {skill}")
+
+    print("\n" + "=" * 50)
 
 if __name__ == "__main__":
     main()
