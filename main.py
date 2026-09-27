@@ -8,6 +8,12 @@ from src.job_analyzer import (
     extract_job_skills,
     compare_resume_to_job
 )
+from src.claude_tailer import tailor_resume, ClaudeTailorError
+from src.docx_generator import (
+    generate_tailored_docx,
+    get_tailored_output_path,
+    DocxGenerationError
+)
 
 def load_rules():
     with open("config/rules.yaml", "r", encoding="utf-8") as file:
@@ -51,12 +57,18 @@ def print_report(results, file_path):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python main.py <resume.docx> <job.txt>")
+    args = sys.argv[1:]
+    tailor = "--tailor" in args
+
+    if tailor:
+        args.remove("--tailor")
+
+    if len(args) != 2:
+        print("Usage: python main.py <resume.docx> <job.txt> [--tailor]")
         return
 
-    resume_path = sys.argv[1]
-    job_path = sys.argv[2]
+    resume_path = args[0]
+    job_path = args[1]
 
     rules = load_rules()
 
@@ -115,6 +127,42 @@ def main():
         print(f"✗ {skill}")
 
     print("\n" + "=" * 50)
+
+    if not tailor:
+        return
+
+    print("\n" + "=" * 50)
+    print("         TAILORED RESUME (CLAUDE)")
+    print("=" * 50)
+
+    try:
+        tailored_resume = tailor_resume(
+            resume_text,
+            job_text,
+            comparison["matched_skills"],
+            comparison["missing_skills"]
+        )
+    except ClaudeTailorError as error:
+        print(f"\nError: {error}")
+        sys.exit(1)
+
+    print("\n" + tailored_resume)
+    print("\n" + "=" * 50)
+
+    output_path = get_tailored_output_path(resume_path)
+
+    try:
+        generate_tailored_docx(
+            resume_path,
+            tailored_resume,
+            output_path
+        )
+    except DocxGenerationError as error:
+        print(f"\nDOCX generation failed: {error}")
+        print("The tailored resume text above was not saved.")
+        sys.exit(1)
+
+    print(f"\nTailored resume saved to: {output_path}")
 
 if __name__ == "__main__":
     main()
