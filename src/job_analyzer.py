@@ -1,3 +1,6 @@
+from src.parser import parse_resume, get_resume_text
+
+
 def extract_job_skills(job_text, skills):
     job_text_lower = job_text.lower()
 
@@ -38,3 +41,10 @@ def compare_resume_to_job(resume_text, job_skills):
         "matched_skills": matched_skills,
         "missing_skills": missing_skills
     }
+
+
+def compare_resume_file_to_job(file_path, job_skills):
+    return compare_resume_to_job(
+        get_resume_text(parse_resume(file_path)),
+        job_skills
+    )

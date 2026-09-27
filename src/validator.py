@@ -1,3 +1,4 @@
+from src.parser import parse_resume
 from src.rules import (
     check_required_sections,
     check_contact_information
@@ -27,3 +28,10 @@ def validate_resume(parsed_resume, rules):
     )
 
     return results
+
+
+def validate_resume_file(file_path, rules):
+    return validate_resume(
+        parse_resume(file_path),
+        rules
+    )

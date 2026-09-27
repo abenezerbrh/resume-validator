@@ -52,7 +52,7 @@ MISSING FROM RESUME (do NOT add these):
 """
 
 
-def tailor_resume(resume_text, job_text, matched_skills, missing_skills):
+def run_claude(prompt):
     claude_path = shutil.which("claude")
 
     if claude_path is None:
@@ -60,13 +60,6 @@ def tailor_resume(resume_text, job_text, matched_skills, missing_skills):
             "Claude Code CLI not found. Install Claude Code and make sure "
             "the 'claude' command is available on your PATH."
         )
-
-    prompt = build_tailor_prompt(
-        resume_text,
-        job_text,
-        matched_skills,
-        missing_skills
-    )
 
     # Remove any API key so Claude Code uses the logged-in Claude subscription.
     env = os.environ.copy()
@@ -113,3 +106,14 @@ def tailor_resume(resume_text, job_text, matched_skills, missing_skills):
         raise ClaudeTailorError("Claude Code returned an empty response.")
 
     return output
+
+
+def tailor_resume(resume_text, job_text, matched_skills, missing_skills):
+    prompt = build_tailor_prompt(
+        resume_text,
+        job_text,
+        matched_skills,
+        missing_skills
+    )
+
+    return run_claude(prompt)
