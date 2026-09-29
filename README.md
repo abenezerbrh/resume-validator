@@ -85,6 +85,28 @@ Each application stores: `id`, `company`, `job_title`, `job_id`, `job_posting_pa
 
 All SQL lives in `src/database.py`; the tracking rules live in `src/application_tracker.py`. The `applications` table is created automatically the first time the tracker connects.
 
+## Phase 7: Telegram Bot
+
+A personal Telegram bot for viewing and updating tracked applications and tailoring resumes from your phone. The bot is only an interface: it calls the same tracker, tailoring, versioning, and validation code as `main.py` and `tracker.py`, and PostgreSQL stays the single source of truth.
+
+| Command | What it does |
+|---|---|
+| `/start` | Explains the bot and lists the commands (`/help` works too) |
+| `/applications` | Lists tracked applications and their statuses |
+| `/show <job_id>` | Shows one application: company, title, status, dates, resume version, notes |
+| `/status <job_id> <status>` | Updates the status using the tracker's rules; invalid statuses are rejected |
+| `/tailor <job_id>` | Tailors the resume for an existing application, then sends a summary and the tailored `.docx` |
+
+`/tailor` runs the full workflow for an application that is already tracked:
+
+- Uses the job posting stored with the application. The resume is the original resume recorded by the application's linked version; for an application that has never been tailored, set `DEFAULT_RESUME_PATH`
+- Creates a new Phase 5 version, runs Phase 4 validation on it, and links it to the application
+- Never creates an application or marks it `Applied`: a `Saved` application becomes `Tailored`, and later statuses are kept
+- Replies with the version, validation counts, job alignment, claim validation, and the Phase 4 final status, then sends the `.docx`
+- Runs one tailoring job at a time
+
+Only the Telegram user in `TELEGRAM_ALLOWED_USER_ID` can use the bot; everyone else gets `Access denied.` Errors are shown as short messages; details go to the bot's console log, never to Telegram. The bot token is removed from every log line.
+
 ## Tech Stack
 
 - Python
@@ -93,6 +115,7 @@ All SQL lives in `src/database.py`; the tracking rules live in `src/application_
 - pytest
 - Claude Code CLI (Phases 3 and 4)
 - PostgreSQL, psycopg, and python-dotenv (Phase 6)
+- python-telegram-bot (Phase 7)
 
 ## Setup
 
@@ -108,7 +131,7 @@ Phases 3 and 4 also require [Claude Code](https://claude.com/claude-code) to be 
 
 The application tracker needs a running PostgreSQL server. Phases 1–5 do not.
 
-1. Copy `.env.example` to `.env` and fill in your settings. `.env` is git-ignored; never commit it.
+1. Create a `.env` file in the project folder with your settings. `.env` is git-ignored; never commit it.
 
    ```text
    DB_HOST=localhost
@@ -128,6 +151,33 @@ The application tracker needs a running PostgreSQL server. Phases 1–5 do not.
    ```
 
 The test database (`TEST_DB_NAME`) is created automatically by the tests.
+
+### Telegram bot (Phase 7)
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the bot token it gives you.
+2. Find your numeric Telegram user ID, for example by messaging [@userinfobot](https://t.me/userinfobot).
+3. Add both to `.env` (never commit or share the token):
+
+   ```text
+   TELEGRAM_BOT_TOKEN=<token from BotFather>
+   TELEGRAM_ALLOWED_USER_ID=<your numeric user ID>
+   # Optional: resume to tailor for applications that have never been tailored
+   DEFAULT_RESUME_PATH=resumes/Abenezer_Balcha_Resume_BMO.docx
+   ```
+
+4. Check the setup without starting the bot. This checks the settings, the database, and the token, and never prints the token:
+
+   ```bash
+   python bot.py --check
+   ```
+
+5. Start the bot and message it from your Telegram account:
+
+   ```bash
+   python bot.py
+   ```
+
+   The bot runs while this command is running; stop it with Ctrl+C. It needs PostgreSQL, and `/tailor` needs Claude Code, on the same computer.
 
 ## Usage
 
@@ -185,9 +235,9 @@ python tracker.py link BMO reports/versions/BMO/20260929-150218   # link an exis
 pytest
 ```
 
-The tests cover the Phase 3 DOCX generator, Phase 4 validation (resume validation, job alignment, claim validation parsing, and final status), Phase 5 versioning, and the Phase 6 application tracker. Claude calls are mocked, so the tests do not need Claude Code.
+The tests cover the Phase 3 DOCX generator, Phase 4 validation (resume validation, job alignment, claim validation parsing, and final status), Phase 5 versioning, the Phase 6 application tracker, the shared tailoring workflow, and the Phase 7 Telegram bot. Claude calls are mocked, so the tests do not need Claude Code. The bot tests use fake Telegram messages, so they need no bot token and make no Telegram API calls.
 
-The Phase 6 tests use only the database named by `TEST_DB_NAME`, never `DB_NAME`, and clear its `applications` table before each test. They are skipped if `TEST_DB_NAME` is not set, and fail if it is the same as `DB_NAME`.
+The database tests use only the database named by `TEST_DB_NAME`, never `DB_NAME`, and clear its `applications` table before each test. They are skipped if `TEST_DB_NAME` is not set, and fail if it is the same as `DB_NAME`.
 
 ## Project Structure
 
@@ -211,16 +261,22 @@ resume-validator/
 │   ├── phase4_summary.py    # Phase 4 final status
 │   ├── resume_versioning.py # Phase 5 tailored resume versions
 │   ├── database.py          # Phase 6 PostgreSQL access (all SQL)
-│   └── application_tracker.py # Phase 6 application tracking rules
+│   ├── application_tracker.py # Phase 6 application tracking rules
+│   ├── tailoring_workflow.py # Phases 1-5 workflow shared by main.py and the bot
+│   └── telegram_bot.py      # Phase 7 Telegram commands and replies
 ├── tests/
+│   ├── conftest.py          # Test database fixtures
 │   ├── test_docx_generator.py
 │   ├── test_validator.py
 │   ├── test_phase4.py
 │   ├── test_resume_versioning.py
-│   └── test_application_tracker.py
-├── .env.example             # Database settings template (copy to .env)
+│   ├── test_application_tracker.py
+│   ├── test_tailoring_workflow.py
+│   └── test_telegram_bot.py
+├── .env                     # Local settings and secrets (git-ignored)
 ├── main.py
 ├── tracker.py               # Phase 6 application tracker command line
+├── bot.py                   # Phase 7 Telegram bot (python bot.py [--check])
 ├── pytest.ini
 ├── requirements.txt
 └── README.md
@@ -238,3 +294,5 @@ resume-validator/
 - Application statuses can change in any order; only unknown statuses are rejected
 - Resume version paths are stored relative to the project folder, so they only resolve from this project
 - The `applications` table is created if missing, but later schema changes will need a migration step
+- The Telegram bot runs only while `python bot.py` is running on this computer, and handles one `/tailor` at a time
+- `/tailor` for an application that has never been tailored needs `DEFAULT_RESUME_PATH`, because the tracker does not store which resume belongs to an application

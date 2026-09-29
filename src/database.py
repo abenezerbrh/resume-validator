@@ -76,7 +76,7 @@ def get_db_settings(database=None):
         raise DatabaseConfigError(
             "Missing database settings: " + ", ".join(missing)
             + ". Set them in your environment or in a .env file "
-            "(see .env.example)."
+            "(see README.md)."
         )
 
     return {

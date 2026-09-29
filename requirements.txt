@@ -3,3 +3,4 @@ PyYAML
 pytest
 psycopg[binary]
 python-dotenv
+python-telegram-bot>=22,<23
