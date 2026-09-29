@@ -1,3 +1,5 @@
 python-docx
 PyYAML
 pytest
+psycopg[binary]
+python-dotenv

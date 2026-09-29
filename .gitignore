@@ -4,8 +4,12 @@ venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-tmp/
 
+# Local secrets (database password). Only the template is committed.
 .env
+.env.*
+!.env.example
 
 reports/
 

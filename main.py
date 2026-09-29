@@ -1,5 +1,8 @@
 import hashlib
 import sys
+from pathlib import Path
+
+import psycopg
 import yaml
 
 from src.parser import parse_resume, get_resume_text
@@ -11,13 +14,22 @@ from src.job_analyzer import (
     compare_resume_file_to_job
 )
 from src.claude_tailer import tailor_resume, ClaudeTailorError
-from src.docx_generator import (
-    generate_tailored_docx,
-    get_tailored_output_path,
-    DocxGenerationError
+from src.docx_generator import DocxGenerationError
+from src.resume_versioning import (
+    job_id_from_path,
+    make_job_id,
+    save_tailored_version,
+    VersionExistsError
 )
 from src.claim_validator import validate_claims, ClaimValidationError
 from src.phase4_summary import get_final_status, READY_FOR_REVIEW
+from src.application_tracker import (
+    ApplicationError,
+    find_application,
+    link_resume_version,
+    open_tracker
+)
+from src.database import DatabaseConfigError
 
 def load_rules():
     with open("config/rules.yaml", "r", encoding="utf-8") as file:
@@ -172,6 +184,50 @@ def print_phase4_summary(validation_results, comparison, claims, final):
     print("\n" + "=" * 50)
 
 
+def check_tracked_application(job_id):
+    """Fail before tailoring if --track cannot link the new version."""
+    try:
+        with open_tracker() as conn:
+            application = find_application(conn, job_id)
+    except (DatabaseConfigError, psycopg.OperationalError) as error:
+        return f"Could not connect to the application tracker: {error}"
+
+    if application is None:
+        return (
+            f"No tracked application for job_id '{job_id}'. "
+            f"Add it first with: python tracker.py add --job-id {job_id} ..."
+        )
+
+    return None
+
+
+def print_tracked_application(job_id, version):
+    print("\n" + "=" * 50)
+    print("           APPLICATION TRACKER")
+    print("=" * 50)
+
+    try:
+        with open_tracker() as conn:
+            application = link_resume_version(conn, job_id, version)
+    except (
+        DatabaseConfigError,
+        ApplicationError,
+        psycopg.OperationalError
+    ) as error:
+        print(f"\n⚠ Resume version was saved but not linked: {error}")
+    else:
+        print(
+            f"\nApplication: {application['company']} - "
+            f"{application['job_title']}"
+        )
+        print(f"Job ID: {application['job_id']}")
+        print(f"Status: {application['status']}")
+        print(f"Resume version: {application['resume_version_id']}")
+        print(f"Resume path: {application['resume_version_path']}")
+
+    print("\n" + "=" * 50)
+
+
 def main():
     args = sys.argv[1:]
     tailor = "--tailor" in args
@@ -179,12 +235,34 @@ def main():
     if tailor:
         args.remove("--tailor")
 
+    track = "--track" in args
+
+    if track:
+        args.remove("--track")
+
+    job_id = None
+
+    if "--job-id" in args:
+        index = args.index("--job-id")
+
+        if index + 1 < len(args):
+            job_id = make_job_id(args[index + 1])
+            del args[index:index + 2]
+
     if len(args) != 2:
-        print("Usage: python main.py <resume.docx> <job.txt> [--tailor]")
+        print(
+            "Usage: python main.py <resume.docx> <job.txt> "
+            "[--tailor] [--job-id <id>] [--track]"
+        )
+        return
+
+    if track and not tailor:
+        print("--track links a newly tailored resume, so it requires --tailor.")
         return
 
     resume_path = args[0]
     job_path = args[1]
+    job_id = job_id or job_id_from_path(job_path)
 
     rules = load_rules()
 
@@ -247,6 +325,13 @@ def main():
     if not tailor:
         return
 
+    if track:
+        tracker_error = check_tracked_application(job_id)
+
+        if tracker_error:
+            print(f"\nError: {tracker_error}")
+            sys.exit(1)
+
     original_hash = file_sha256(resume_path)
 
     print("\n" + "=" * 50)
@@ -267,20 +352,21 @@ def main():
     print("\n" + tailored_resume)
     print("\n" + "=" * 50)
 
-    output_path = get_tailored_output_path(resume_path)
-
     try:
-        generate_tailored_docx(
+        version = save_tailored_version(
             resume_path,
             tailored_resume,
-            output_path
+            job_id
         )
-    except DocxGenerationError as error:
+    except (DocxGenerationError, VersionExistsError) as error:
         print(f"\nDOCX generation failed: {error}")
         print("The tailored resume text above was not saved.")
         sys.exit(1)
 
+    output_path = Path(version["tailored_docx"])
+
     print(f"\nTailored resume saved to: {output_path}")
+    print(f"Version: {version['job_id']} / {version['version_id']}")
 
     tailored_results = validate_resume_file(
         output_path,
@@ -335,6 +421,9 @@ def main():
         print(f"\nOriginal resume unchanged: {resume_path}")
     else:
         print(f"\nWarning: original resume was modified: {resume_path}")
+
+    if track:
+        print_tracked_application(job_id, version)
 
 if __name__ == "__main__":
     main()
